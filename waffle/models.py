@@ -39,9 +39,16 @@ class BaseModel(models.Model):
         return keyfmt(get_setting(cls.SINGLE_CACHE_KEY), name)
 
     @classmethod
+    def _cache_get(cls, key):
+        try:
+            return cache.get(key)
+        except:
+            return CACHE_EMPTY
+
+    @classmethod
     def get(cls, name):
         cache_key = cls._cache_key(name)
-        cached = cache.get(cache_key)
+        cached = cls._cache_get(cache_key)
         if cached == CACHE_EMPTY:
             logger.warning("%s: %s does not exist", cls.__name__, name)
             return cls()
@@ -51,10 +58,10 @@ class BaseModel(models.Model):
         try:
             obj = cls.get_from_db(name)
         except cls.DoesNotExist:
-            cache.add(cache_key, CACHE_EMPTY)
+            cache.add(cache_key, CACHE_EMPTY, 1)
             return cls()
 
-        cache.add(cache_key, obj)
+        cache.add(cache_key, obj, 1)
         return obj
 
     @classmethod
@@ -67,7 +74,7 @@ class BaseModel(models.Model):
     @classmethod
     def get_all(cls):
         cache_key = get_setting(cls.ALL_CACHE_KEY)
-        cached = cache.get(cache_key)
+        cached = cls._cache_get(cache_key)
         if cached == CACHE_EMPTY:
             return []
         if cached:
@@ -75,10 +82,10 @@ class BaseModel(models.Model):
 
         objs = cls.get_all_from_db()
         if not objs:
-            cache.add(cache_key, CACHE_EMPTY)
+            cache.add(cache_key, CACHE_EMPTY, 1)
             return []
 
-        cache.add(cache_key, objs)
+        cache.add(cache_key, objs, 1)
         return objs
 
     @classmethod
@@ -223,7 +230,7 @@ class Flag(BaseModel):
 
     def _get_user_ids(self):
         cache_key = keyfmt(get_setting('FLAG_USERS_CACHE_KEY'), self.name)
-        cached = cache.get(cache_key)
+        cached = type(self)._cache_get(cache_key)
         if cached == CACHE_EMPTY:
             return set()
         if cached:
@@ -231,15 +238,15 @@ class Flag(BaseModel):
 
         user_ids = set(self.users.all().values_list('pk', flat=True))
         if not user_ids:
-            cache.add(cache_key, CACHE_EMPTY)
+            cache.add(cache_key, CACHE_EMPTY, 1)
             return set()
 
-        cache.add(cache_key, user_ids)
+        cache.add(cache_key, user_ids, 1)
         return user_ids
 
     def _get_group_ids(self):
         cache_key = keyfmt(get_setting('FLAG_GROUPS_CACHE_KEY'), self.name)
-        cached = cache.get(cache_key)
+        cached = type(self)._cache_get(cache_key)
         if cached == CACHE_EMPTY:
             return set()
         if cached:
@@ -247,10 +254,10 @@ class Flag(BaseModel):
 
         group_ids = set(self.groups.all().values_list('pk', flat=True))
         if not group_ids:
-            cache.add(cache_key, CACHE_EMPTY)
+            cache.add(cache_key, CACHE_EMPTY, 1)
             return set()
 
-        cache.add(cache_key, group_ids)
+        cache.add(cache_key, group_ids, 1)
         return group_ids
 
     def is_active_for_user(self, user):
